@@ -1,0 +1,30 @@
+import mysql.connector
+
+
+# Connessione al database MySQL
+mydb = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    password="",
+    database="pysql"
+)
+
+cursor = mydb.cursor()
+#creazione tabella file
+cursor.execute("""CREATE TABLE file (
+               Nomefile VARCHAR(255)  PRIMARY KEY 
+               )""")
+#creazione tabella nome personaggio
+cursor.execute("""CREATE TABLE nomepersonaggio (
+               Id INT AUTO_INCREMENT PRIMARY KEY,
+               Nomedelfile VARCHAR(255) NOT NULL, 
+               Nome VARCHAR(255) NOT NULL, 
+               Numeroriga INT NOT NULL,  
+               RigaConNome MEDIUMTEXT NOT NULL, 
+               Contesto MEDIUMTEXT NOT NULL,
+               FOREIGN KEY (Nomedelfile) REFERENCES File(Nomefile) ON DELETE CASCADE ON UPDATE CASCADE
+               )""")
+
+# Conferma le modifiche e chiudi la connessione al database
+mydb.commit()
+mydb.close()
