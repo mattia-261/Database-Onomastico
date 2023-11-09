@@ -1,0 +1,95 @@
+import re
+from docx import Document
+import os
+import mysql.connector
+
+# Connessione al database MySQL
+mydb = mysql.connector.connect(
+    host="localhost",
+    user="user",
+    password="password",
+    database="pysql"
+)
+
+cursor = mydb.cursor()
+
+#Funzione che converte un file docx in un file txt
+def convert_docx_to_txt(docx_file_path, txt_file_path):
+    try:
+        doc = Document(docx_file_path)
+        with open(txt_file_path, 'w', encoding='utf-8') as txt_file:
+            for paragraph in doc.paragraphs:
+                txt_file.write(paragraph.text + '\n')
+        
+    except Exception as e:
+        print(f"Errore durante la conversione: {str(e)}")
+
+
+# Funzione per estrarre nomi da un file di input e salvare i risultati nel database
+def extract_and_save_names_with_context(input_file_path):
+    try:
+        # Espressione regolare per selezionare nomi con la prima lettera maiuscola, con lettere accentate
+        pattern = r'\b(?:[A-ZÀ-ÖÙ-Ý][a-zà-öù-ý\'-]*\s(?:d\'|de|le|l\'|au|du|des|la)\s)?(?:[A-ZÀ-ÖÙ-Ý][a-zà-öù-ý\'-]*\s)*(?:[A-ZÀ-ÖÙ-Ý][a-zà-öù-ý\'-]*\b)'
+
+        # Leggi il testo dal file di input
+        with open(input_file_path, 'r', encoding='utf-8') as input_file:
+            lines = input_file.readlines()
+        
+        # Trova tutti i nomi e le loro righe nel testo
+        matches = []
+
+        for i, line in enumerate(lines):
+             for m in re.finditer(pattern, line):
+                  matches.append((m.group(0), i))
+
+        # Salva i nomi trovati con il contesto nel database
+        for match, line_number in matches:
+            # le due righe precedenti sono separate da il simbolo /
+            if line_number > 1:
+                 previous_line = (lines[line_number - 2]).strip()+"/"+lines[line_number - 1]
+            elif line_number > 0:
+                 previous_line = lines[line_number - 1]
+            else:
+                 previous_line=''
+
+            current_line = lines[line_number]
+            # le due righe successive sono separate da il simbolo /
+            if line_number < len(lines) - 2:
+                 next_line = (lines[line_number + 1]).strip() +"/"+ lines[line_number + 2]
+            elif line_number < len(lines) - 1:
+                 next_line = lines[line_number + 1]
+            else:
+                 next_line = ''
+            # tra le righe precedenti e successive c'è il simbolo //
+            Nomefile= nome_file
+            Nomepersonaggio= match
+            Numeroriga=line_number + 1
+            Riganome=current_line.strip()
+            Contesto=previous_line.strip()+"//"+next_line
+            insert_query = "INSERT INTO nomepersonaggio (Nomedelfile, Nome, Numeroriga, RigaConNome, Contesto) VALUES (%s, %s, %s, %s, %s)"
+            data = (Nomefile, Nomepersonaggio, Numeroriga, Riganome, Contesto)
+            cursor.execute(insert_query, data)
+
+        print(f"Nomi estratti da '{nome_file}'")
+
+    except FileNotFoundError:
+        print(f"Errore: Il file '{input_file_path}' non è stato trovato.")
+
+
+
+output_text_file_path = r"C:\Users\matti\Desktop\volumi\normale.txt"
+cartella = r"C:\Users\matti\Desktop\volumi\Prova"
+nomi_file = [f for f in os.listdir(cartella) if os.path.isfile(os.path.join(cartella, f))]
+
+# Per ogni file docx nella cartella lo converte in un file txt e salva i nomi estratti nel database
+for nome_file in nomi_file:
+    if nome_file.endswith(".docx"):
+        insert_query_1 = "INSERT INTO file (Nomefile) VALUES (%s)"
+        data1 = (nome_file,) # La virgola è utilizzata per creare una tupla contenente un singolo elemento.
+        cursor.execute(insert_query_1, data1)
+        docx_file_path = os.path.join(cartella, nome_file)  # Percorso completo del file DOCX
+        convert_docx_to_txt(docx_file_path, output_text_file_path)
+        extract_and_save_names_with_context(output_text_file_path)
+
+mydb.commit()
+mydb.close()
